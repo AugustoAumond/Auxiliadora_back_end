@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model users {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+
+  properties properties[]
+
+  rental_proposal rental_proposal[]
+
+  rental_proposal_logs rental_proposal_logs[]
+}
+
+model properties {
+  id          String   @id @default(uuid())
+  ownerId     String
+  owner       users    @relation(fields: [ownerId], references: [id])
+  city        String
+  address     String
+  description String
+  value       Float
+  bedrooms    Int      @default(1)
+  parking     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  status      String   @default("disponível")
+
+  rental_proposal rental_proposal[]
+
+  rental_proposal_logs rental_proposal_logs[]
+}
+
+enum proposal_status {
+  NOVA
+  ANALISE_CREDITO
+  CONTRATO_EMITIDO
+  ASSINADO
+  ATIVO
+  REPROVADA
+  CANCELADA
+}
+
+model rental_proposal {
+  id          String          @id @default(uuid())
+  applicantId String
+  propertyId  String
+  status      proposal_status @default(NOVA)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  applicant   users           @relation(fields: [applicantId], references: [id])
+  property    properties      @relation(fields: [propertyId], references: [id])
+}
+
+model rental_proposal_logs {
+  id String @id @default(uuid())
+
+  propertyId      String
+  applicantId     String
+  ownerPropertyId String
+
+  propertiesStatus     String
+  rentalProposalStatus proposal_status
+
+  message String
+
+  updatedAt DateTime @default(now())
+
+  property properties @relation(fields: [propertyId], references: [id])
+
+  applicant users @relation(fields: [applicantId], references: [id])
+}

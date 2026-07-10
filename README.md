@@ -89,3 +89,9 @@ Exemplo:
 ``` bash
 GET /properties
 ```
+
+# 9. Arquivo com todas requisições (Bruno App)
+
+[API ALUGUEL-documentation-local.html](https://github.com/user-attachments/files/29897213/API.ALUGUEL-documentation-local.html)
+
+

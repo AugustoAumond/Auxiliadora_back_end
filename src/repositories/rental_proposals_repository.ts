@@ -44,8 +44,6 @@ export class RentalProposalsRepository {
 
     //Melhoria, implementar um paginação;
     async findAll() {
-
         return prisma.rental_proposal.findMany();
-
     }
 }

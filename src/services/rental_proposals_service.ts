@@ -13,15 +13,11 @@ import { AppError } from "../errors/app_error";
 export class RentalProposalsService {
 
     private repository: RentalProposalsRepository;
-    private properties: PropertiesRepository;
-    private users: UserRepository;
     private logsRepository: RentalProposalLogsRepository;
 
 
     constructor() {
         this.repository = new RentalProposalsRepository();
-        this.properties = new PropertiesRepository();
-        this.users = new UserRepository();
         this.logsRepository = new RentalProposalLogsRepository();
     }
 

@@ -18,10 +18,11 @@ export class RentalProposalsController {
         const { id } = req.params;
         const { action } = req.body;
 
+        let act = String(action).toUpperCase();
 
         const proposal = await this.service.updateStatus(
             id as string,
-            action as RentalProposalAction
+            act as RentalProposalAction
         );
 
 

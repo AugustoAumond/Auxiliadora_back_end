@@ -28,15 +28,21 @@ model properties {
   city        String
   address     String
   description String
-  value       Float
+  value       Decimal  @db.Decimal(12, 2)
   bedrooms    Int      @default(1)
   parking     Boolean  @default(false)
   createdAt   DateTime @default(now())
-  status      String   @default("disponível")
+  status      PropertyStatus @default(AVAILABLE)
 
   rental_proposal rental_proposal[]
 
   rental_proposal_logs rental_proposal_logs[]
+}
+
+enum PropertyStatus {
+  AVAILABLE
+  NEGOTIATING
+  RENTED
 }
 
 enum proposal_status {

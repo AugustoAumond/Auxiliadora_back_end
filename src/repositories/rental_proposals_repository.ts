@@ -1,49 +1,39 @@
-import { proposal_status } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../database/prisma";
+import { Pagination, paginationMeta } from "../types/pagination";
 
-
-export interface CreateRentalProposals {
-    applicantId: string;
-    propertyId: string;
-    status?: string;
-}
-
+const proposalDetails = {
+  applicant: { select: { id: true, name: true, email: true } },
+  property: {
+    select: {
+      id: true,
+      city: true,
+      address: true,
+      status: true,
+      ownerId: true,
+    },
+  },
+} satisfies Prisma.rental_proposalInclude;
 
 export class RentalProposalsRepository {
+  async findById(id: string) {
+    return prisma.rental_proposal.findUnique({ where: { id } });
+  }
 
-    async create(data: CreateRentalProposals) {
-        return prisma.rental_proposal.create({
-            data: {
-                propertyId: data.propertyId,
-                applicantId: data.applicantId
-            }
-        });
-    }
-
-    async findById(id: string) {
-        return prisma.rental_proposal.findUnique({
-            where: {
-                id
-            }
-        });
-    }
-
-    
-    async updateStatus( id: string, status: proposal_status) {
-        if (status){
-            return prisma.rental_proposal.update({
-                where: {
-                    id
-                },
-                data: {
-                    status
-                }
-            });
-        }
-    }
-
-    //Melhoria, implementar um paginação;
-    async findAll() {
-        return prisma.rental_proposal.findMany();
-    }
+  async findAll(actorId: string, { page, limit }: Pagination) {
+    const where = {
+      OR: [{ applicantId: actorId }, { property: { ownerId: actorId } }],
+    };
+    const [data, total] = await prisma.$transaction([
+      prisma.rental_proposal.findMany({
+        include: proposalDetails,
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.rental_proposal.count({ where }),
+    ]);
+    return { data, meta: paginationMeta(page, limit, total) };
+  }
 }

@@ -1,36 +1,24 @@
 import { AppError } from "../errors/app_error";
-import { CreateProperties, PropertiesRepository } from "../repositories/properties_repository";
+import {
+  CreateProperties,
+  PropertiesRepository,
+} from "../repositories/properties_repository";
 import { UserRepository } from "../repositories/user_repository";
-
+import { Pagination } from "../types/pagination";
 
 export class PropertiesService {
-    private repository: PropertiesRepository;
-    private users: UserRepository;
+  private readonly repository = new PropertiesRepository();
+  private readonly users = new UserRepository();
 
-
-
-    constructor() {
-        this.repository = new PropertiesRepository();
-        this.users = new UserRepository();
+  async create(ownerId: string, data: CreateProperties) {
+    if (!(await this.users.findById(ownerId))) {
+      throw new AppError("Usuário não existe", 404);
     }
 
-    //O ideal seria trabalhar com o JWT pegando o usuário do token, porém farei dessa forma para agilizar o desenvolvimento;
-    async create(data: CreateProperties) {
-        const userExists = await this.users.findById(data.ownerId);
+    return this.repository.create(ownerId, data);
+  }
 
-        if (!userExists) {
-            throw new AppError("Usuário não existe no banco de dados!", 400);
-        }
-
-
-        return this.repository.create(data);
-    }
-
-
-    async findAll() {
-
-        return this.repository.findAll();
-
-    }
-
+  async findAll(pagination: Pagination) {
+    return this.repository.findAll(pagination);
+  }
 }

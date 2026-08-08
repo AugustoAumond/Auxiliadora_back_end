@@ -1,5 +1,6 @@
 #!/bin/sh
+set -eu
 
 npx prisma migrate deploy
 
-npm run dev
+exec npm run dev

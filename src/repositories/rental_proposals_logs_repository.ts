@@ -1,37 +1,20 @@
-import { proposal_status } from "@prisma/client";
 import { prisma } from "../database/prisma";
-
-
-export interface CreateRentalProposalLog {
-    propertyId: string;
-
-    applicantId: string;
-
-    ownerPropertyId: string;
-
-    propertiesStatus: string;
-
-    rentalProposalStatus: proposal_status;
-
-    message: string;
-}
-
+import { Pagination, paginationMeta } from "../types/pagination";
 
 export class RentalProposalLogsRepository {
-
-
-    async create(
-        data: CreateRentalProposalLog
-    ) {
-
-        return prisma.rental_proposal_logs.create({
-            data
-        });
-    }
-
-    //Melhoria, implementar um paginação;
-    async findAll() {
-        return prisma.rental_proposal_logs.findMany();
-    }
-
+  async findAll(actorId: string, { page, limit }: Pagination) {
+    const where = {
+      OR: [{ applicantId: actorId }, { property: { ownerId: actorId } }],
+    };
+    const [data, total] = await prisma.$transaction([
+      prisma.rental_proposal_logs.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.rental_proposal_logs.count({ where }),
+    ]);
+    return { data, meta: paginationMeta(page, limit, total) };
+  }
 }

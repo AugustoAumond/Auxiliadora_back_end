@@ -1,45 +1,42 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../database/prisma";
-
+import { Pagination, paginationMeta } from "../types/pagination";
 
 export interface CreateProperties {
-    ownerId: string;
-    description: string;
-    value: number;
-    bedrooms?: number;
-    parking?: boolean;
-    status?: string;
-    city: string;
-    address: string;
+  description: string;
+  value: number;
+  bedrooms?: number;
+  parking?: boolean;
+  city: string;
+  address: string;
 }
 
+const propertyDetails = {
+  owner: { select: { id: true, name: true, email: true } },
+} satisfies Prisma.propertiesInclude;
 
 export class PropertiesRepository {
-    async create(data: CreateProperties) {
-        return prisma.properties.create({
-            data: {
-                description: data.description,
-                value: data.value,
-                address: data.address,
-                city: data.city,
-                ownerId: data.ownerId,
-                bedrooms: data?.bedrooms,
-                parking: data?.parking,
-                status: data?.status
-            }
-        });
-    }
+  async create(ownerId: string, data: CreateProperties) {
+    return prisma.properties.create({
+      data: { ...data, ownerId },
+      include: propertyDetails,
+    });
+  }
 
-    async findById(id: string) {
-        return prisma.properties.findUnique({
-            where: {
-                id
-            }
-        });
-    }
+  async findById(id: string) {
+    return prisma.properties.findUnique({ where: { id } });
+  }
 
-
-    //Melhoria, implementar um paginação;
-    async findAll() {
-        return prisma.properties.findMany();
-    }
+  async findAll({ page, limit }: Pagination) {
+    const [data, total] = await prisma.$transaction([
+      prisma.properties.findMany({
+        include: propertyDetails,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.properties.count(),
+    ]);
+    return { data, meta: paginationMeta(page, limit, total) };
+  }
 }

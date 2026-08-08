@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-export const createUserSchema = z.object({
-  name: z.string().trim().min(3, "Nome deve ter no mínimo 3 caracteres"),
+export const loginSchema = z.object({
   email: z.string().trim().email("Email inválido").toLowerCase(),
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });

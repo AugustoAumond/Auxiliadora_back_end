@@ -1,154 +1,120 @@
-import { proposal_status } from "@prisma/client";
+import { PropertyStatus, proposal_status } from "@prisma/client";
 import { prisma } from "../database/prisma";
-import { PropertiesRepository } from "../repositories/properties_repository";
-import { CreateRentalProposals } from "../repositories/rental_proposals_repository";
-import { RentalProposalsRepository } from "../repositories/rental_proposals_repository"; 
-import { UserRepository } from "../repositories/user_repository";
-import { RentalProposalMachine } from "../state_machine/state_machine";
-import { RentalProposalAction, RentalProposalStatus } from "../state_machine/states";
-import { RentalProposalLogsRepository } from "../repositories/rental_proposals_logs_repository"; 
 import { AppError } from "../errors/app_error";
+import { RentalProposalLogsRepository } from "../repositories/rental_proposals_logs_repository";
+import { RentalProposalsRepository } from "../repositories/rental_proposals_repository";
+import { RentalProposalMachine } from "../state_machine/state_machine";
+import { RentalProposalAction } from "../state_machine/states";
+import { Pagination } from "../types/pagination";
 
+interface CreateRentalProposal {
+  propertyId: string;
+}
 
 export class RentalProposalsService {
+  private readonly repository = new RentalProposalsRepository();
+  private readonly logsRepository = new RentalProposalLogsRepository();
 
-    private repository: RentalProposalsRepository;
-    private logsRepository: RentalProposalLogsRepository;
+  async create(applicantId: string, data: CreateRentalProposal) {
+    return prisma.$transaction(async (tx) => {
+      const applicant = await tx.users.findUnique({
+        where: { id: applicantId },
+        select: { id: true },
+      });
+      if (!applicant) throw new AppError("Usuário não encontrado", 404);
 
-
-    constructor() {
-        this.repository = new RentalProposalsRepository();
-        this.logsRepository = new RentalProposalLogsRepository();
-    }
-
-
-    async create(data: CreateRentalProposals) {
-        return prisma.$transaction(async (tx) => {
-
-            const property = await tx.properties.findUnique({
-                where: {
-                    id: data.propertyId
-                }
-            });
-
-            if (!property) {
-                throw new AppError("Imóvel não encontrado!", 404);
-            }
-
-
-            if (property.status !== "disponível") {
-                throw new AppError("Imóvel indisponível!", 404);
-            }
-
-            const ownerProperty = await tx.properties.findUnique({
-                where: {
-                    id: data.propertyId,
-                    ownerId: data.applicantId
-                }
-            });
-
-            if (ownerProperty){
-                throw new AppError("O dono do imóvel não pode fazer uma proposta para a sua própria propriedade!", 404);
-            }
-
-            const proposal = await tx.rental_proposal.create({
-                data: {
-                    applicantId: data.applicantId,
-                    propertyId: data.propertyId
-                }
-            });
-
-
-            await tx.properties.update({
-                where: {
-                    id: data.propertyId
-                },
-                data: {
-                    status: "em_negociacao"
-                }
-            });
-
-            return proposal;
-        });
-    }
-
-    async updateStatus( id: string, action: RentalProposalAction) {     
-        const proposal = await this.repository.findById(id);
-
-        if (!proposal) {
-            throw new AppError("Proposta não encontrada!", 404);
-        }
-
-        const nextStatus = RentalProposalMachine.transition(
-            proposal.status,
-            action
+      const property = await tx.properties.findUnique({
+        where: { id: data.propertyId },
+      });
+      if (!property) throw new AppError("Imóvel não encontrado", 404);
+      if (property.ownerId === applicantId)
+        throw new AppError(
+          "O proprietário não pode criar proposta para o próprio imóvel",
+          403,
         );
 
-        return prisma.$transaction(async (tx) => {
-            const updatedProposal = await tx.rental_proposal.update({
-                where: {
-                    id
-                },
-                data: {
-                    status: nextStatus
-                }
-            });
+      const claimed = await tx.properties.updateMany({
+        where: { id: data.propertyId, status: PropertyStatus.AVAILABLE },
+        data: { status: PropertyStatus.NEGOTIATING },
+      });
+      if (claimed.count !== 1) throw new AppError("Imóvel indisponível", 409);
 
-            const property = await tx.properties.findUnique({
-                where: {
-                    id: proposal.propertyId
-                }
-            });
+      return tx.rental_proposal.create({
+        data: { applicantId, propertyId: data.propertyId },
+      });
+    });
+  }
 
-            if (!property) {
-                throw new AppError("Imóvel não encontrado!", 404);
-            }
+  async updateStatus(
+    id: string,
+    action: RentalProposalAction,
+    actorId: string,
+  ) {
+    return prisma.$transaction(async (tx) => {
+      const proposal = await tx.rental_proposal.findUnique({ where: { id } });
+      if (!proposal) throw new AppError("Proposta não encontrada", 404);
 
-            if (nextStatus === proposal_status.CANCELADA || nextStatus === proposal_status.REPROVADA) {
-                await tx.properties.update({
-                    where: {
-                        id: proposal.propertyId
-                    },
-                    data: {
-                        status: "disponível"
-                    }
-                });
-            }
+      const property = await tx.properties.findUnique({
+        where: { id: proposal.propertyId },
+      });
+      if (!property) throw new AppError("Imóvel não encontrado", 404);
 
+      const allowed =
+        action === RentalProposalAction.CANCELAR
+          ? actorId === proposal.applicantId || actorId === property.ownerId
+          : actorId === property.ownerId;
+      if (!allowed)
+        throw new AppError("Você não tem permissão para esta ação", 403);
 
-            if ( nextStatus === proposal_status.ATIVO) {
-                await tx.properties.update({
-                    where: {
-                        id: proposal.propertyId
-                    },
-                    data: {
-                        status: "alugado"
-                    }
-                });
-            }
+      const nextStatus = RentalProposalMachine.transition(
+        proposal.status,
+        action,
+      );
+      const updated = await tx.rental_proposal.updateMany({
+        where: { id, status: proposal.status },
+        data: { status: nextStatus },
+      });
+      if (updated.count !== 1)
+        throw new AppError(
+          "A proposta foi alterada por outra requisição; tente novamente",
+          409,
+        );
 
+      const nextPropertyStatus =
+        nextStatus === proposal_status.ATIVO
+          ? PropertyStatus.RENTED
+          : nextStatus === proposal_status.CANCELADA ||
+              nextStatus === proposal_status.REPROVADA
+            ? PropertyStatus.AVAILABLE
+            : property.status;
 
-            await tx.rental_proposal_logs.create({
-                data: {
-                    propertyId: property.id,
-                    applicantId: proposal.applicantId,
-                    ownerPropertyId: property.ownerId,
-                    propertiesStatus: nextStatus === proposal_status.ATIVO ? "alugado" : property.status, 
-                    rentalProposalStatus: nextStatus, 
-                    message: `A proposta foi atualizada para o status ${nextStatus}`
-                }
-            });
-            return updatedProposal;
+      if (nextPropertyStatus !== property.status) {
+        await tx.properties.update({
+          where: { id: property.id },
+          data: { status: nextPropertyStatus },
         });
-    }
+      }
 
+      await tx.rental_proposal_logs.create({
+        data: {
+          propertyId: property.id,
+          applicantId: proposal.applicantId,
+          ownerPropertyId: property.ownerId,
+          propertiesStatus: nextPropertyStatus,
+          rentalProposalStatus: nextStatus,
+          message: `A proposta foi atualizada para o status ${nextStatus}`,
+        },
+      });
 
-    async findAll() {
-        return this.repository.findAll();
-    }
+      return tx.rental_proposal.findUniqueOrThrow({ where: { id } });
+    });
+  }
 
-    async findAllLogs() {
-        return this.logsRepository.findAll();
-    }
+  async findAll(actorId: string, pagination: Pagination) {
+    return this.repository.findAll(actorId, pagination);
+  }
 
+  async findAllLogs(actorId: string, pagination: Pagination) {
+    return this.logsRepository.findAll(actorId, pagination);
+  }
 }

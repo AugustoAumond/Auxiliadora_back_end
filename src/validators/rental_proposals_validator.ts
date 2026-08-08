@@ -1,18 +1,14 @@
 import { z } from "zod";
+import { RentalProposalAction } from "../state_machine/states";
 
-export const createRenatalProposalsSchema = z.object({
+export const createRentalProposalsSchema = z.object({
+  propertyId: z.uuid({ error: "Imóvel inválido" }),
+});
 
-    applicantId: z
-        .uuid({
-            error: "Usuário interessado no imóvel é obrigatório ou não existe",
-        }),
+export const updateRentalProposalStatusSchema = z.object({
+  action: z.enum(RentalProposalAction),
+});
 
-    propertyId: z
-        .uuid({
-            error: "Imóvel não existe ou está indisponível",
-        }),
-
-    status: z
-        .string()
-        .optional()
+export const idParamSchema = z.object({
+  id: z.uuid({ error: "Identificador inválido" }),
 });

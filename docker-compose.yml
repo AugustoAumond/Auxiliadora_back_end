@@ -1,5 +1,4 @@
 services:
-
   api:
     container_name: api-alugel
     build: .
@@ -11,13 +10,16 @@ services:
     environment:
       PORT: 3333
       DATABASE_URL: postgresql://postgres:postgres@db:5432/api_alugel
+      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5173}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
     container_name: postgres-alugel
     image: postgres:16-alpine
-    restart: always 
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -26,6 +28,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d api_alugel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   postgres_data:

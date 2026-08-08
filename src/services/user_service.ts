@@ -1,48 +1,25 @@
+import bcrypt from "bcryptjs";
 import { AppError } from "../errors/app_error";
-import { UserRepository } from "../repositories/user_repository";
-import crypto from "crypto";
-
-interface CreateUserDTO {
-    name: string;
-    email: string;
-    password: string;
-}
-
-
-export function md5(value: string) {
-  return crypto
-    .createHash("md5")
-    .update(value)
-    .digest("hex");
-}
-
+import { CreateUserDTO, UserRepository } from "../repositories/user_repository";
+import { Pagination } from "../types/pagination";
 
 export class UserService {
+  private readonly repository = new UserRepository();
 
-    private repository: UserRepository;
+  async create(data: CreateUserDTO) {
+    const userExists = await this.repository.findByEmail(data.email);
 
-
-    constructor() {
-        this.repository = new UserRepository();
+    if (userExists) {
+      throw new AppError("Usuário já cadastrado", 409);
     }
 
+    return this.repository.create({
+      ...data,
+      password: await bcrypt.hash(data.password, 12),
+    });
+  }
 
-    async create(data: CreateUserDTO) {
-
-        const userExists = await this.repository.findByEmail(data.email);
-
-        if (userExists) {
-            throw new AppError("Usuário já cadastrado!", 400);
-        }
-
-        data.password = md5(data.password);
-
-        return this.repository.create(data);
-    }
-
-
-    async findAll() {
-        return this.repository.findAll();
-    }
-
+  async findAll(pagination: Pagination) {
+    return this.repository.findAll(pagination);
+  }
 }

@@ -1,31 +1,20 @@
 import { Request, Response } from "express";
 import { UserService } from "../services/user_service";
 import { createUserSchema } from "../validators/user_validator";
-import { RentalProposalMachine } from "../state_machine/state_machine";
-import { RentalProposalAction, RentalProposalStatus } from "../state_machine/states";
-import { prisma } from "../database/prisma";
+import { paginationSchema } from "../validators/pagination_validator";
 
 export class UserController {
+  private readonly service = new UserService();
 
-    private UserService: UserService;
+  async create(req: Request, res: Response) {
+    return res
+      .status(201)
+      .json(await this.service.create(createUserSchema.parse(req.body)));
+  }
 
-    constructor() {
-        this.UserService = new UserService();
-    }
-
-
-    async create(req: Request, res: Response) {
-         const data = createUserSchema.parse(req.body);
-
-        const user = await this.UserService.create(data);
-
-        return res.status(201).json(user);
-    }
-
-    async findAll(req: Request, res: Response) {
-        const users = await this.UserService.findAll();
-
-        return res.status(200).json(users);
-    }
-
+  async findAll(req: Request, res: Response) {
+    return res
+      .status(200)
+      .json(await this.service.findAll(paginationSchema.parse(req.query)));
+  }
 }

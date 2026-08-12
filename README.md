@@ -15,6 +15,8 @@ docker compose up --build
 
 A API estará em `http://localhost:3333`. O Compose aguarda o PostgreSQL ficar saudável e aplica as migrations automaticamente.
 
+O ambiente de desenvolvimento sincroniza as dependências dentro do container a cada inicialização. Assim, dependências novas também são instaladas quando há um volume antigo em `/app/node_modules`.
+
 ```bash
 docker compose down       # encerra os containers
 docker compose down -v    # encerra e apaga os dados locais do banco

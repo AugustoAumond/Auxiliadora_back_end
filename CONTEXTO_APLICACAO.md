@@ -45,6 +45,7 @@ tests/           testes unitários do fluxo
 - `dotenv/config` carrega o ambiente. `.env.example` documenta `DATABASE_URL`, `PORT`, `JWT_SECRET` e `CORS_ORIGIN`. Sem `JWT_SECRET`, apenas desenvolvimento usa uma chave temporária; produção falha ao iniciar.
 - Docker aguarda health check do PostgreSQL, aplica migrations e possui encerramento gracioso/Prisma disconnect no servidor.
 - O entrypoint Docker executa `npm ci` e `prisma generate` antes das migrations para evitar que o volume de `node_modules` fique desatualizado em relação ao `package-lock.json`.
+- `ts-node.files` está habilitado para que o `ts-node-dev` carregue a extensão global de `Express.Request` usada por `req.auth`.
 - Scripts: `dev`, `build`, `start`, `test`, `lint`, `format:check`.
 - ESLint e Prettier configurados; há testes unitários para transições da máquina de estados.
 
@@ -65,3 +66,4 @@ tests/           testes unitários do fluxo
 | 08/08/2026 | Implementação das recomendações | JWT, bcrypt, autorização, paginação, enum/Decimal, migration, índices, health check, ferramentas de qualidade e testes implementados.  |
 | 08/08/2026 | Correção de inicialização local | JWT usa chave temporária somente fora de produção quando `.env` não define `JWT_SECRET`; produção continua exigindo segredo explícito. |
 | 11/08/2026 | Correção do Docker              | Entry point sincroniza dependências e Prisma Client para impedir que volume antigo de `node_modules` oculte novas dependências.        |
+| 11/08/2026 | Correção de tipos no Docker     | `ts-node-dev` passa a carregar arquivos de declaração globais, corrigindo o tipo de `req.auth`.                                        |
